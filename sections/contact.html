@@ -1,0 +1,63 @@
+<!-- Contact info card on the left, inquiry form on the right -->
+<section id="contact">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Contact Us</div>
+      <h2>Send an inquiry, or just call.</h2>
+    </div>
+
+    <div class="contact-grid">
+
+      <!-- Left: phone, address, and Facebook link -->
+      <div class="info-card">
+        <div class="info-row">
+          <div class="lbl">Phone</div>
+          <!-- tel: makes it clickable to dial on a phone -->
+          <div class="val"><a href="tel:+639956317627">0995 631 7627</a></div>
+        </div>
+        <div class="info-row">
+          <div class="lbl">Address</div>
+          <div class="val">Rizal Street, Poblacion East,<br>San Nicolas, Pangasinan, Philippines</div>
+        </div>
+        <div class="info-row">
+          <div class="lbl">Facebook</div>
+          <div class="val">
+            <a href="https://www.facebook.com/people/Palis-Paint-Center/61590207343370/" target="_blank" rel="noopener">Palis Paint Center</a>
+            <br>
+            <a class="fb-btn" href="https://www.facebook.com/people/Palis-Paint-Center/61590207343370/" target="_blank" rel="noopener">Message us on Facebook</a>
+          </div>
+        </div>
+      </div>
+
+      <form id="inquiryForm">
+        <div class="field">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required>
+        </div>
+        <div class="field">
+          <label for="phone">Phone Number</label>
+          <input type="tel" id="phone" name="phone" required>
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email">
+        </div>
+        <div class="field">
+          <label for="type">Inquiry Type</label>
+          <select id="type" name="type">
+            <option>Product Inquiry</option>
+            <option>Custom Color Request</option>
+            <option>Painting Service Estimate</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" required></textarea>
+        </div>
+        <button type="submit" class="submit-btn">Send Inquiry</button>
+        <div class="form-note">Opens your email app addressed to Palis Paint Center with your message filled in.</div>
+      </form>
+
+    </div>
+  </div>
+</section>
