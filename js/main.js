@@ -104,28 +104,42 @@ function initProducts(products) {
   render("All");
 }
 
+// Handles the "Send Inquiry" form: submits it straight to Formspree
 function initForm() {
   const form = document.getElementById("inquiryForm");
   if (!form) return;
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    const name = document.getElementById("name").value.trim();
-    const phone = document.getElementById("phone").value.trim();
-    const email = document.getElementById("email").value.trim();
-    const type = document.getElementById("type").value;
-    const message = document.getElementById("message").value.trim();
 
-    const subject = `${type} — ${name}`;
-    const body =
-`Name: ${name}
-Phone: ${phone}
-Email: ${email}
-Inquiry Type: ${type}
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault(); // stop the normal page-reload form submission
 
-Message:
-${message}`;
+    const submitBtn = form.querySelector(".submit-btn");
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = "Sending...";
+    submitBtn.disabled = true;
 
-    window.location.href = `mailto:superhero7622@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    try {
+      const response = await fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "Accept": "application/json" } // tells Formspree to reply with JSON, not redirect
+      });
+
+      if (response.ok) {
+        // success: clear the form and show a thank-you message in place of the button
+        form.reset();
+        submitBtn.textContent = "Sent — thank you!";
+        setTimeout(() => {
+          submitBtn.textContent = originalText;
+          submitBtn.disabled = false;
+        }, 4000);
+      } else {
+        throw new Error("Form submission failed");
+      }
+    } catch (err) {
+      console.error(err);
+      submitBtn.textContent = "Something went wrong — try again";
+      submitBtn.disabled = false;
+    }
   });
 }
 
