@@ -1,0 +1,14 @@
+[
+  {"category": "Boysen", "item": "Gloss Latex", "unit": "3 Tins", "price": "3,100 PHP", "swatch": "#c23b2c"},
+  {"category": "Boysen", "item": "Flat Latex", "unit": "3 Tins", "price": "2,700 PHP", "swatch": "#e2a638"},
+  {"category": "Boysen", "item": "Plexibond", "unit": "3 Tins", "price": "3,400 PHP", "swatch": "#2f7566"},
+  {"category": "Roofguard Boysen", "item": "Spanish Red", "unit": "2 Tins", "price": "2,720 PHP", "swatch": "#a13f2b"},
+  {"category": "Rain or Shine", "item": "Ivory / Tulle White / Milk / Tulips / Coldmist", "unit": "4 Gals", "price": "677 PHP", "swatch": "#efe6d3"},
+  {"category": "Domino", "item": "Texas QDE White", "unit": "8 Gals", "price": "468 PHP", "swatch": "#f4f1ea"},
+  {"category": "Domino", "item": "Epoxy Primer White", "unit": "4 Gals", "price": "608 PHP", "swatch": "#e9e4d6"},
+  {"category": "Thinner", "item": "Paint Thinner", "unit": "3 Gals", "price": "435 PHP", "swatch": "#cbb23a"},
+  {"category": "Thinner", "item": "Lacquer Thinner", "unit": "6 Gals", "price": "295 PHP", "swatch": "#d6c65a"},
+  {"category": "Plastic Varnish", "item": "950 ML Maple / Brown / Mahogany", "unit": "6 Pcs", "price": "150 PHP", "swatch": "#7a4a2b"},
+  {"category": "Paint Brush", "item": "1/2 inch", "unit": "2 Box", "price": "10 PHP", "swatch": "#2f4f7a"},
+  {"category": "Roller", "item": "#7 Roller", "unit": "1 Box", "price": "80 PHP", "swatch": "#7a3f6b"}
+]
