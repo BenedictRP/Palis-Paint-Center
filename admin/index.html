@@ -13,12 +13,13 @@
 </head>
 <body>
 
+<!-- Login -->
 <div id="login" class="login hidden">
   <form id="loginForm" class="login-card" autocomplete="off">
     <img src="../images/palis-logo.png" alt="" class="login-logo">
     <div class="eyebrow">Admin Panel</div>
     <h1>Palis Paint Center</h1>
-    <label>Username<input id="loginUser" required autofocus></label>
+    <label>Email<input id="loginUser" type="email" required autofocus></label>
     <label>Password<input id="loginPass" type="password" required></label>
     <div id="loginError" class="form-error" role="alert"></div>
     <button class="btn btn-gold" type="submit">Sign in</button>
@@ -26,16 +27,17 @@
   </form>
 </div>
 
+<!-- App shell -->
 <div id="app" class="app hidden">
   <aside id="sidebar" class="sidebar">
     <div class="brand">
       <div class="brand-name">palis</div>
       <div class="brand-sub">PAINT CENTER / ADMIN</div>
     </div>
-    <nav id="nav"></nav>    
+    <nav id="nav"></nav>
     <div class="side-foot">
       <div class="side-label">STORE WORKSPACE</div>
-      <div class="side-user"><span class="avatar" id="avatar">A</span><span>Hi, <b id="whoami">admin</b>!</span></div>
+      <div class="side-user"><span class="avatar" id="avatar">A</span><span>Hi, <b id="whoami">admin</b></span></div>
       <a class="side-link" href="../index.html" target="_blank" rel="noopener">View website ↗</a>
       <button id="logoutBtn" class="side-link" type="button">Logout</button>
     </div>
@@ -54,6 +56,8 @@
 <dialog id="modal" class="modal"></dialog>
 <div id="toast" class="toast" role="status"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
 <script src="../js/store.js"></script>
 <script src="admin.js"></script>
 </body>

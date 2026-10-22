@@ -1,0 +1,4 @@
+window.PALIS_CONFIG = {
+  SUPABASE_URL: "https://akfuvddyypwpgduqiree.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrZnV2ZGR5eXB3cGdkdXFpcmVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2NTI0OTcsImV4cCI6MjEwODIyODQ5N30.0-dNdYincGzD-zFXDugxOwPkKRniEgRCTRgGP72anNA",
+};

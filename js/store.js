@@ -1,62 +1,30 @@
-const PalisStore = (() => {
-  const K = {
-    products: "palis_products",
-    inquiries: "palis_inquiries",
-    settings: "palis_settings",
-    events: "palis_events",
-    logs: "palis_logs",
-    auth: "palis_auth",
-  };
+/* Shared Supabase helper used by BOTH the public site and the admin panel. */
+const PalisDB = (() => {
+  const cfg = window.PALIS_CONFIG || {};
+  const ready = !!(window.supabase && cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY &&
+                   !cfg.SUPABASE_URL.includes("YOUR-"));
+  const client = ready ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
 
-  const DEFAULT_SETTINGS = {
-    phone: "0995 631 7627",
-    address: "Rizal Street, Poblacion East, San Nicolas, Pangasinan, Philippines",
-    facebook: "https://www.facebook.com/people/Palis-Paint-Center/61590207343370/",
-    hours: "",
-  };
+  const fmtPrice = (n) => `${Number(n).toLocaleString("en-US")} PHP`;
 
-  function read(key, fallback) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch (e) {
-      return fallback;
-    }
+  // Public: active products, shaped the way the website expects
+  async function getPublicProducts() {
+    if (!ready) return null;
+    const { data, error } = await client.from("products").select("*").order("id");
+    if (error) { console.warn("Supabase products error:", error.message); return null; }
+    return data.map((p) => ({ ...p, price: fmtPrice(p.price) }));
   }
 
-  function write(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch (e) {
-      console.warn("Could not save " + key, e);
-      return false;
-    }
-  }
-
-  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-
-  function getSettings() {
-    return Object.assign({}, DEFAULT_SETTINGS, read(K.settings, {}));
-  }
-
-  // Called by the public inquiry form after a successful submit.
-  function addInquiry(data) {
-    const list = read(K.inquiries, []);
-    list.unshift({
-      id: uid(),
-      name: data.name || "",
-      phone: data.phone || "",
-      email: data.email || "",
-      type: data.type || "Product Inquiry",
-      message: data.message || "",
-      status: "new",
-      archived: false,
-      note: "",
-      created: new Date().toISOString(),
+  // Public: save an inquiry so the admin can see it
+  async function addInquiry(d) {
+    if (!ready) return false;
+    const { error } = await client.from("inquiries").insert({
+      name: d.name || "", phone: d.phone || "", email: d.email || "",
+      type: d.type || "Product Inquiry", message: d.message || "",
     });
-    write(K.inquiries, list);
+    if (error) console.warn("Supabase inquiry error:", error.message);
+    return !error;
   }
 
-  return { K, DEFAULT_SETTINGS, read, write, uid, getSettings, addInquiry };
+  return { ready, client, fmtPrice, getPublicProducts, addInquiry };
 })();

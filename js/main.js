@@ -9,20 +9,14 @@ const SECTIONS = {
   "footer-mount":       "sections/footer.html",
 };
 
-// Fallback product data, used only if data/products.json can't be fetched
+// Fallback product data, used only if the database can't be reached
 const FALLBACK_PRODUCTS = [
-  {category:"Boysen", item:"Gloss Latex", unit:"3 Tins", price:"3,100 PHP", swatch:"#c23b2c"},
-  {category:"Boysen", item:"Flat Latex", unit:"3 Tins", price:"2,700 PHP", swatch:"#e2a638"},
-  {category:"Boysen", item:"Plexibond", unit:"3 Tins", price:"3,400 PHP", swatch:"#2f7566"},
-  {category:"Roofguard Boysen", item:"Spanish Red", unit:"2 Tins", price:"2,720 PHP", swatch:"#a13f2b"},
-  {category:"Rain or Shine", item:"Ivory / Tulle White / Milk / Tulips / Coldmist", unit:"4 Gals", price:"677 PHP", swatch:"#efe6d3"},
-  {category:"Domino", item:"Texas QDE White", unit:"8 Gals", price:"468 PHP", swatch:"#f4f1ea"},
-  {category:"Domino", item:"Epoxy Primer White", unit:"4 Gals", price:"608 PHP", swatch:"#e9e4d6"},
-  {category:"Thinner", item:"Paint Thinner", unit:"3 Gals", price:"435 PHP", swatch:"#cbb23a"},
-  {category:"Thinner", item:"Lacquer Thinner", unit:"6 Gals", price:"295 PHP", swatch:"#d6c65a"},
-  {category:"Plastic Varnish", item:"950 ML Maple / Brown / Mahogany", unit:"6 Pcs", price:"150 PHP", swatch:"#7a4a2b"},
-  {category:"Paint Brush", item:"1/2 inch", unit:"2 Box", price:"10 PHP", swatch:"#2f4f7a"},
-  {category:"Roller", item:"#7 Roller", unit:"1 Box", price:"80 PHP", swatch:"#7a3f6b"},
+  {category:"Boysen", item:"Gloss Latex", unit:"Per Tin", price:"3,100 PHP", swatch:"#c23b2c"},
+  {category:"Boysen", item:"Flat Latex", unit:"Per Tin", price:"2,700 PHP", swatch:"#e2a638"},
+  {category:"Boysen", item:"Plexibond", unit:"Per Tin", price:"3,400 PHP", swatch:"#2f7566"},
+  {category:"Domino", item:"Texas QDE White", unit:"Per Gallon", price:"468 PHP", swatch:"#f4f1ea"},
+  {category:"Paint Brush", item:"1/2 inch", unit:"Per Pc", price:"10 PHP", swatch:"#2f4f7a"},
+  {category:"Roller", item:"#7 Roller", unit:"Per Pc", price:"80 PHP", swatch:"#7a3f6b"},
 ];
 
 async function loadSections() {
@@ -41,9 +35,9 @@ async function loadSections() {
 }
 
 async function loadProducts() {
-  // Products edited in the admin panel (/admin) take priority over the JSON file.
-  const edited = PalisStore.read(PalisStore.K.products, null);
-  if (edited) return edited.filter(p => !p.archived);
+  // Live catalog from Supabase (edited in /admin); falls back to the JSON file
+  const live = await PalisDB.getPublicProducts();
+  if (live) return live;
   try {
     const res = await fetch("data/products.json");
     return await res.json();
@@ -108,7 +102,7 @@ function initProducts(products) {
   render("All");
 }
 
-// Handles the "Send Inquiry" form: submits it straight to Formspree
+// Handles the "Send Inquiry" form: saves to Supabase and emails via Formspree
 function initForm() {
   const form = document.getElementById("inquiryForm");
   if (!form) return;
@@ -122,16 +116,18 @@ function initForm() {
     submitBtn.disabled = true;
 
     try {
-      const response = await fetch(form.action, {
-        method: "POST",
-        body: new FormData(form),
-        headers: { "Accept": "application/json" } // tells Formspree to reply with JSON, not redirect
-      });
+      const data = Object.fromEntries(new FormData(form));
+      // Save to the database (for the admin panel) and email via Formspree at the same time
+      const [saved, response] = await Promise.all([
+        PalisDB.addInquiry(data),
+        fetch(form.action, {
+          method: "POST",
+          body: new FormData(form),
+          headers: { "Accept": "application/json" }
+        }).catch(() => ({ ok: false })),
+      ]);
 
-      if (response.ok) {
-        // keep a copy for the admin panel's Inquiries page
-        PalisStore.addInquiry(Object.fromEntries(new FormData(form)));
-        // success: clear the form and show a thank-you message in place of the button
+      if (saved || response.ok) {
         form.reset();
         submitBtn.textContent = "Sent — thank you!";
         setTimeout(() => {
@@ -149,20 +145,6 @@ function initForm() {
   });
 }
 
-// Fills the contact details from the values saved in the admin panel's Store Info page
-function applySettings() {
-  const s = PalisStore.getSettings();
-  const tel = "+63" + s.phone.replace(/\D/g, "").replace(/^0/, "");
-  document.querySelectorAll("[data-setting='phone']").forEach(a => { a.textContent = s.phone; a.href = "tel:" + tel; });
-  document.querySelectorAll("[data-setting='address']").forEach(el => { el.textContent = s.address; });
-  document.querySelectorAll("[data-setting='facebook']").forEach(a => { a.href = s.facebook; });
-  const hoursRow = document.getElementById("hoursRow");
-  if (hoursRow && s.hours) {
-    hoursRow.hidden = false;
-    hoursRow.querySelector(".val").textContent = s.hours;
-  }
-}
-
 function setYear() {
   const yearEl = document.getElementById("year");
   if (yearEl) yearEl.textContent = new Date().getFullYear();
@@ -174,6 +156,5 @@ function setYear() {
   initMenu();
   initProducts(products);
   initForm();
-  applySettings();
   setYear();
 })();
