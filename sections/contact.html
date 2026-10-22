@@ -13,19 +13,23 @@
         <div class="info-row">
           <div class="lbl">Phone</div>
           <!-- tel: makes it clickable to dial on a phone -->
-          <div class="val"><a href="tel:+639956317627">0995 631 7627</a></div>
+          <div class="val"><a href="tel:+639956317627" data-setting="phone">0995 631 7627</a></div>
         </div>
         <div class="info-row">
           <div class="lbl">Address</div>
-          <div class="val">Rizal Street, Poblacion East,<br>San Nicolas, Pangasinan, Philippines</div>
+          <div class="val" data-setting="address">Rizal Street, Poblacion East, San Nicolas, Pangasinan, Philippines</div>
         </div>
         <div class="info-row">
           <div class="lbl">Facebook</div>
           <div class="val">
-            <a href="https://www.facebook.com/people/Palis-Paint-Center/61590207343370/" target="_blank" rel="noopener">Palis Paint Center</a>
+            <a href="https://www.facebook.com/people/Palis-Paint-Center/61590207343370/" target="_blank" rel="noopener" data-setting="facebook">Palis Paint Center</a>
             <br>
-            <a class="fb-btn" href="https://www.facebook.com/people/Palis-Paint-Centeactiong r/61590207343370/" target="_blank" rel="noopener">Message us on Facebook</a>
+            <a class="fb-btn" href="https://www.facebook.com/people/Palis-Paint-Center/61590207343370/" target="_blank" rel="noopener" data-setting="facebook">Message us on Facebook</a>
           </div>
+        </div>
+        <div class="info-row" id="hoursRow" hidden>
+          <div class="lbl">Hours</div>
+          <div class="val"></div>
         </div>
       </div>
 
@@ -55,7 +59,7 @@
           <textarea id="message" name="message" required></textarea>
         </div>
         <button type="submit" class="submit-btn">Send Inquiry</button>
-        <div class="form-note">Opens your email app addressed to Palis Paint Center with your message filled in.</div>
+        <div class="form-note">Your message is sent directly to Palis Paint Center. We will reply by phone or email.</div>
       </form>
 
     </div>

@@ -41,6 +41,9 @@ async function loadSections() {
 }
 
 async function loadProducts() {
+  // Products edited in the admin panel (/admin) take priority over the JSON file.
+  const edited = PalisStore.read(PalisStore.K.products, null);
+  if (edited) return edited.filter(p => !p.archived);
   try {
     const res = await fetch("data/products.json");
     return await res.json();
@@ -83,8 +86,9 @@ function initProducts(products) {
         <h4>${p.item}</h4>
         <div class="meta">
           <span class="unit">${p.unit}</span>
-          <span class="price">${p.price}</span>
+          <span class="price">${p.available === false ? "Out of stock" : p.price}</span>
         </div>`;
+      if (p.available === false) card.style.opacity = "0.55";
       gridEl.appendChild(card);
     });
   }
@@ -125,6 +129,8 @@ function initForm() {
       });
 
       if (response.ok) {
+        // keep a copy for the admin panel's Inquiries page
+        PalisStore.addInquiry(Object.fromEntries(new FormData(form)));
         // success: clear the form and show a thank-you message in place of the button
         form.reset();
         submitBtn.textContent = "Sent — thank you!";
@@ -143,6 +149,20 @@ function initForm() {
   });
 }
 
+// Fills the contact details from the values saved in the admin panel's Store Info page
+function applySettings() {
+  const s = PalisStore.getSettings();
+  const tel = "+63" + s.phone.replace(/\D/g, "").replace(/^0/, "");
+  document.querySelectorAll("[data-setting='phone']").forEach(a => { a.textContent = s.phone; a.href = "tel:" + tel; });
+  document.querySelectorAll("[data-setting='address']").forEach(el => { el.textContent = s.address; });
+  document.querySelectorAll("[data-setting='facebook']").forEach(a => { a.href = s.facebook; });
+  const hoursRow = document.getElementById("hoursRow");
+  if (hoursRow && s.hours) {
+    hoursRow.hidden = false;
+    hoursRow.querySelector(".val").textContent = s.hours;
+  }
+}
+
 function setYear() {
   const yearEl = document.getElementById("year");
   if (yearEl) yearEl.textContent = new Date().getFullYear();
@@ -154,5 +174,6 @@ function setYear() {
   initMenu();
   initProducts(products);
   initForm();
+  applySettings();
   setYear();
 })();

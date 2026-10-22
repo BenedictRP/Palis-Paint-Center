@@ -242,3 +242,5 @@ footer{
 @media (prefers-reduced-motion: reduce){
   *{transition:none!important;}
 }
+
+[hidden]{display:none!important;}
