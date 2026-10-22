@@ -116,7 +116,7 @@ function initForm() {
     submitBtn.disabled = true;
 
     try {
-      const data = Object.fromEntries(new FormData(form));
+      const data = { ...Object.fromEntries(new FormData(form)), ...PalisEstimator.getPayload() };
       // Save to the database (for the admin panel) and email via Formspree at the same time
       const [saved, response] = await Promise.all([
         PalisDB.addInquiry(data),
@@ -129,6 +129,7 @@ function initForm() {
 
       if (saved || response.ok) {
         form.reset();
+        PalisEstimator.reset();
         submitBtn.textContent = "Sent — thank you!";
         setTimeout(() => {
           submitBtn.textContent = originalText;
@@ -156,5 +157,6 @@ function setYear() {
   initMenu();
   initProducts(products);
   initForm();
+  await PalisEstimator.init(products);
   setYear();
 })();

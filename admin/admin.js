@@ -12,10 +12,11 @@
     dashboard: ICON('<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>'),
     inbox: ICON('<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'),
     box: ICON('<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>'),
+    calc: ICON('<rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="11" x2="8.01" y2="11"/><line x1="12" y1="11" x2="12.01" y2="11"/><line x1="16" y1="11" x2="16.01" y2="11"/><line x1="8" y1="15" x2="8.01" y2="15"/><line x1="12" y1="15" x2="12.01" y2="15"/><line x1="16" y1="15" x2="16.01" y2="15"/>'),
     archive: ICON('<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>'),
   };
 
-  const state = { products: [], inquiries: [] };
+  const state = { products: [], inquiries: [], settings: null };
   const ui = {
     inq: { q: "", status: "", type: "" },
     prod: { q: "", cat: "", show: "" },
@@ -24,10 +25,12 @@
 
   /* ---------- Data (all reads/writes go to Supabase) ---------- */
   async function loadAll() {
-    const [p, i] = await Promise.all([
+    const [p, i, st] = await Promise.all([
       D.client.from("products").select("*").order("id"),
       D.client.from("inquiries").select("*").order("created_at", { ascending: false }),
+      D.getEstimatorSettings(),
     ]);
+    state.settings = st;
     const err = p.error || i.error;
     if (err) { toast("Could not load data: " + err.message); return false; }
     state.products = p.data;
@@ -48,6 +51,9 @@
   /* ---------- Helpers ---------- */
   const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
   const fmtDateTime = (iso) => new Date(iso).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  const fmt = (n) => D.fmtPHP(n);
+  const estText = (i) => i.estimate_high == null ? "—"
+    : (Number(i.estimate_low) === Number(i.estimate_high) ? fmt(i.estimate_high) : `${fmt(i.estimate_low)} – ${fmt(i.estimate_high)}`);
   const badge = (s) => `<span class="badge b-${s}">${STATUS[s] || s}</span>`;
   const same = (a, b) => String(a) === String(b);
   const find = (list, id) => list.find((x) => same(x.id, id));
@@ -84,12 +90,14 @@
     dashboard: { title: "Dashboard", render: viewDashboard },
     inquiries: { title: "Inquiries", render: viewInquiries },
     products: { title: "Products", render: viewProducts },
+    estimator: { title: "Estimator", render: viewEstimator },
     archive: { title: "Archive", render: viewArchive },
   };
   const NAV = [
     ["Overview", [["dashboard", "Dashboard", "dashboard"]]],
     ["Requests", [["inquiries", "Inquiries", "inbox"]]],
     ["Content", [["products", "Products", "box"]]],
+    ["Configuration", [["estimator", "Estimator", "calc"]]],
     ["Records", [["archive", "Archive", "archive"]]],
   ];
 
@@ -127,18 +135,31 @@
       const max = Math.max(1, ...rows.map((r) => r[1]));
       return rows.length ? rows.map(([l, n]) => `<div class="bar-row"><span>${esc(l)}</span><div class="bar"><span style="width:${(n / max) * 100}%"></span></div><b>${n}</b></div>`).join("") : '<div class="empty">No data yet.</div>';
     };
+    const open = inq.filter((i) => i.status !== "resolved");
+    const pipeline = open.reduce((sum, i) => i.estimate_high == null ? sum : sum + (Number(i.estimate_low) + Number(i.estimate_high)) / 2, 0);
+    const demand = {};
+    inq.forEach((i) => (i.items || []).forEach((it) => {
+      const k = `${it.item} · ${it.unit}`;
+      demand[k] = demand[k] || { qty: 0, value: 0 };
+      demand[k].qty += Number(it.qty); demand[k].value += Number(it.qty) * Number(it.price);
+    }));
+    const top = Object.entries(demand).sort((a, b) => b[1].qty - a[1].qty).slice(0, 8);
     return pageHead("Overview", "Dashboard", "A quick look at inquiries and your catalog.",
       '<button class="btn btn-gold" data-action="new-product" type="button">+ Add product</button>') + `
       <div class="tiles">
         <div class="tile blue"><div class="eyebrow">New inquiries</div><div class="n">${inq.filter((i) => i.status === "new").length}</div><div class="muted">awaiting a reply</div></div>
         <div class="tile"><div class="eyebrow">Open inquiries</div><div class="n">${inq.filter((i) => i.status !== "resolved").length}</div><div class="muted">new + in progress</div></div>
         <div class="tile teal"><div class="eyebrow">Products listed</div><div class="n">${prods.length}</div><div class="muted">${Object.keys(cats).length} categories</div></div>
+        <div class="tile"><div class="eyebrow">Est. value of open inquiries</div><div class="n" style="font-size:26px;padding:8px 0 6px">${fmt(Math.round(pipeline))}</div><div class="muted">from customer estimates</div></div>
         <div class="tile red"><div class="eyebrow">Out of stock</div><div class="n">${prods.filter((p) => !p.available).length}</div><div class="muted">marked unavailable</div></div>
       </div>
       <div class="grid2">
         <div class="card"><h3>Recent inquiries</h3>
           ${inq.slice(0, 5).map((i) => `<div class="list-row"><div><b>${esc(i.name)}</b><div class="muted">${esc(i.type)} · ${fmtDate(i.created_at)}</div></div>${badge(i.status)}</div>`).join("") || '<div class="empty">No inquiries yet.</div>'}
           <div style="margin-top:12px"><a class="btn btn-sm" href="#/inquiries">View all</a></div>
+        </div>
+        <div class="card"><h3>Products customers want to buy</h3><p class="sub">Totals from the product lists in inquiries</p>
+          ${top.map(([name, d]) => `<div class="list-row"><div><b>${esc(name)}</b></div><span class="mono">${d.qty} pcs · ${fmt(d.value)}</span></div>`).join("") || '<div class="empty">No product requests yet.</div>'}
         </div>
         <div class="card"><h3>Products by category</h3>${bars(catRows)}</div>
         <div class="card"><h3>Inquiries by type</h3>${bars(byType)}</div>
@@ -155,12 +176,13 @@
 
   function inquiryRows() {
     const list = filteredInquiries();
-    if (!list.length) return '<tr><td colspan="5"><div class="empty">No inquiries match.</div></td></tr>';
+    if (!list.length) return '<tr><td colspan="6"><div class="empty">No inquiries match.</div></td></tr>';
     return list.map((i) => `<tr class="clickable" data-action="open-inquiry" data-id="${i.id}">
       <td class="muted" style="white-space:nowrap">${fmtDate(i.created_at)}</td>
       <td><b>${esc(i.name)}</b><div class="muted">${esc(i.phone)}</div></td>
       <td>${esc(i.type)}</td>
       <td class="muted">${esc(i.message.length > 70 ? i.message.slice(0, 70) + "…" : i.message)}</td>
+      <td class="mono" style="white-space:nowrap">${estText(i)}</td>
       <td>${badge(i.status)}</td></tr>`).join("");
   }
 
@@ -172,7 +194,7 @@
         <select id="inqStatus"><option value="">All statuses</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${ui.inq.status === k ? "selected" : ""}>${v}</option>`).join("")}</select>
         <select id="inqType"><option value="">All types</option>${TYPES.map((t) => `<option ${ui.inq.type === t ? "selected" : ""}>${t}</option>`).join("")}</select>
       </div>
-      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Customer</th><th>Type</th><th>Message</th><th>Status</th></tr></thead>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Customer</th><th>Type</th><th>Message</th><th>Estimate</th><th>Status</th></tr></thead>
       <tbody id="inqBody">${inquiryRows()}</tbody></table></div>`;
   }
 
@@ -180,6 +202,20 @@
     const i = find(state.inquiries, id);
     if (!i) return;
     const tel = (i.phone || "").replace(/[^\d+]/g, "");
+    const items = i.items || [];
+    const sub = items.reduce((t, it) => t + Number(it.qty) * Number(it.price), 0);
+    const itemsHtml = items.length ? `<h4 class="mini-h">Products requested</h4><table class="mini"><tbody>
+        ${items.map((it) => `<tr><td>${Number(it.qty)} × ${esc(it.item)} <span class="muted">(${esc(it.unit)} @ ${fmt(it.price)})</span></td><td class="mono r">${fmt(it.qty * it.price)}</td></tr>`).join("")}
+        <tr><td><b>Products subtotal</b></td><td class="mono r"><b>${fmt(sub)}</b></td></tr></tbody></table>` : "";
+    const j = i.job;
+    const jobHtml = j ? `<h4 class="mini-h">Paint job</h4><dl class="kv">
+        <dt>Work</dt><dd>${esc(j.service_label)}</dd>
+        <dt>Area</dt><dd>${Number(j.area_sqm)} sq m</dd>
+        <dt>Paint</dt><dd>${j.paint_name ? `${esc(j.paint_name)} — ${Number(j.gallons)} gal @ ${fmt(j.paint_price)} (${Number(j.coats)} coats)` : "Customer's own / not selected"}</dd>
+        <dt>Labor</dt><dd>${fmt(j.labor)} (${fmt(j.rate)} per sq m)</dd>
+        <dt>Materials</dt><dd>${fmt(j.materials)}</dd>
+        <dt>Job estimate</dt><dd><b>${fmt(j.low)} – ${fmt(j.high)}</b></dd></dl>` : "";
+    const totalHtml = i.estimate_high != null ? `<div class="notice" style="margin-top:0"><b>Customer's total estimate:</b> ${estText(i)}</div>` : "";
     openModal(esc(i.name), `<form id="inqForm" data-id="${i.id}">
         <dl class="kv">
           <dt>Phone</dt><dd>${esc(i.phone)}</dd>
@@ -188,6 +224,7 @@
           <dt>Received</dt><dd>${fmtDateTime(i.created_at)}</dd>
           <dt>Message</dt><dd>${esc(i.message)}</dd>
         </dl>
+        ${itemsHtml}${jobHtml}${totalHtml}
         <label class="field">Status<select name="status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${i.status === k ? "selected" : ""}>${v}</option>`).join("")}</select></label>
         <label class="field">Internal note <small>(only visible here)</small><textarea name="note">${esc(i.note)}</textarea></label>
       </form>`,
@@ -205,8 +242,9 @@
   }
 
   function exportInquiries() {
-    const rows = [["Date", "Name", "Phone", "Email", "Type", "Status", "Message", "Note"]]
-      .concat(filteredInquiries().map((i) => [i.created_at, i.name, i.phone, i.email, i.type, STATUS[i.status], i.message, i.note]));
+    const rows = [["Date", "Name", "Phone", "Email", "Type", "Status", "Message", "Products requested", "Estimate low (PHP)", "Estimate high (PHP)", "Note"]]
+      .concat(filteredInquiries().map((i) => [i.created_at, i.name, i.phone, i.email, i.type, STATUS[i.status], i.message,
+        (i.items || []).map((it) => `${it.qty} x ${it.item} (${it.unit})`).join("; "), i.estimate_low, i.estimate_high, i.note]));
     const csv = rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" }));
@@ -256,7 +294,7 @@
     openModal(isEdit ? "Edit product" : "Add product", `<form id="prodForm" data-id="${p.id || ""}">
       <label class="field">Category / brand<input name="category" list="catList" required value="${esc(p.category)}" placeholder="e.g. Boysen"><datalist id="catList">${categories().map((c) => `<option value="${esc(c)}">`).join("")}</datalist></label>
       <label class="field">Product name<input name="item" required value="${esc(p.item)}"></label>
-      <div class="row2"><label class="field">Unit / pack<input name="unit" required value="${esc(p.unit)}" placeholder="e.g. Per Gallon"></label>
+      <div class="row2"><label class="field">Unit / pack<input name="unit" required value="${esc(p.unit)}" placeholder="e.g. 4 Gals"></label>
       <label class="field">Price (PHP)<input name="price" type="number" min="0" step="any" required value="${esc(p.price)}"></label></div>
       <div class="row2"><label class="field">Swatch color<input name="swatch" type="color" value="${esc(p.swatch)}"></label>
       <label class="check" style="align-self:end;padding-bottom:10px"><input type="checkbox" name="available" ${p.available ? "checked" : ""}> In stock</label></div>
@@ -275,6 +313,89 @@
     closeModal();
     if (id) await db(D.client.from("products").update(row).eq("id", id), "Product updated");
     else await db(D.client.from("products").insert(row), "Product added");
+  }
+
+  /* ---------- Estimator ---------- */
+  const paintProducts = () => state.products.filter((p) => !p.archived && p.available && p.unit === "Per Gallon" && D.PAINT_CATS.includes(p.category));
+  const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "service";
+
+  function svcRows() {
+    return state.settings.services.map((s, i) => `<div class="svc-row">
+      <input data-svc-label aria-label="Service name" value="${esc(s.label)}" placeholder="Service name">
+      <input data-svc-rate aria-label="Rate per sq m" type="number" min="0" step="any" value="${esc(s.rate)}">
+      <button class="btn btn-sm btn-danger" data-action="remove-service" data-i="${i}" type="button" aria-label="Remove">✕</button></div>`).join("");
+  }
+
+  function readSettingsForm() {
+    const f = $("#estForm");
+    if (!f) return;
+    const rows = [...f.querySelectorAll(".svc-row")];
+    state.settings = {
+      ...state.settings,
+      margin_pct: Number(f.elements.margin_pct.value),
+      coats: Number(f.elements.coats.value),
+      coverage_sqm_per_gallon: Number(f.elements.coverage.value),
+      services: rows.map((row, i) => ({
+        key: (state.settings.services[i] || {}).key || slug(row.querySelector("[data-svc-label]").value),
+        label: row.querySelector("[data-svc-label]").value.trim(),
+        rate: Number(row.querySelector("[data-svc-rate]").value),
+      })),
+    };
+  }
+
+  // v = { svc, area, paint }; defaults are used for the first draw, before the inputs exist
+  function calcOut(v = { svc: 0, area: 40, paint: "" }) {
+    const s = state.settings;
+    const svc = s.services[Number(v.svc)];
+    const area = Number(v.area);
+    if (!svc || !(area > 0)) return '<div class="muted">Enter an area to see the estimate.</div>';
+    const paint = v.paint ? find(state.products, v.paint) : null;
+    const r = D.calcJob(s, { rate: Number(svc.rate), area, paintPrice: paint ? Number(paint.price) : 0 });
+    return `<div class="list-row"><span>Labor (${area} sq m × ${fmt(svc.rate)})</span><b>${fmt(r.labor)}</b></div>
+      ${paint ? `<div class="list-row"><span>Paint (${r.gallons} gal × ${fmt(paint.price)}, ${s.coats} coats)</span><b>${fmt(r.materials)}</b></div>` : ""}
+      <div class="list-row"><span>Estimated range (±${s.margin_pct}%)</span><b>${fmt(r.low)} – ${fmt(r.high)}</b></div>`;
+  }
+
+  function viewEstimator() {
+    const s = state.settings;
+    return pageHead("Configuration", "Estimator", "Set the rates used by the website's price estimator. Every amount is in Philippine pesos (PHP).") + `
+      <div class="grid2">
+        <div class="card"><h3>Global logic</h3>
+          <form id="estForm">
+            <label class="field">Price range margin (%) <small>The estimate is shown as total − margin to total + margin.</small>
+              <input name="margin_pct" type="number" min="0" max="100" step="any" required value="${esc(s.margin_pct)}"></label>
+            <div class="row2">
+              <label class="field">Coats of paint<input name="coats" type="number" min="1" max="5" step="1" required value="${esc(s.coats)}"></label>
+              <label class="field">Coverage (sq m per gallon)<input name="coverage" type="number" min="1" step="any" required value="${esc(s.coverage_sqm_per_gallon)}"></label>
+            </div>
+            <h3 style="margin:8px 0 14px;font-size:16px">Service type pricing</h3>
+            <p class="sub">Labor rate per square meter, in PHP.</p>
+            ${svcRows()}
+            <div class="actions" style="margin-top:12px">
+              <button class="btn" data-action="add-service" type="button">+ Add service</button>
+              <button class="btn btn-gold" type="submit">Save estimator settings</button>
+            </div>
+          </form>
+        </div>
+        <div class="card"><h3>Quick estimate</h3><p class="sub">Try the same calculation customers see on the website.</p>
+          <label class="field">Type of work<select id="calcService">${s.services.map((x, i) => `<option value="${i}">${esc(x.label)}</option>`).join("")}</select></label>
+          <label class="field">Area (square meters)<input id="calcArea" type="number" min="1" step="any" value="40"></label>
+          <label class="field">Paint<select id="calcPaint"><option value="">Labor only</option>${paintProducts().map((p) => `<option value="${p.id}">${esc(p.category)} ${esc(p.item)} — ${fmt(p.price)}/gal</option>`).join("")}</select></label>
+          <div id="calcOut">${calcOut()}</div>
+          <p class="muted" style="margin-top:10px">Paint gallons = area × coats ÷ coverage, rounded up.</p>
+        </div>
+      </div>`;
+  }
+
+  async function saveEstimator() {
+    readSettingsForm();
+    const s = state.settings;
+    if (s.services.some((x) => !x.label || !(x.rate >= 0))) return toast("Every service needs a name and a rate.");
+    if (!(s.coverage_sqm_per_gallon > 0)) return toast("Coverage must be more than 0.");
+    await db(D.client.from("estimator_settings").upsert({
+      id: 1, margin_pct: s.margin_pct, coats: s.coats, coverage_sqm_per_gallon: s.coverage_sqm_per_gallon,
+      services: s.services, updated_at: new Date().toISOString(),
+    }), "Estimator settings saved");
   }
 
   /* ---------- Archive ---------- */
@@ -318,6 +439,8 @@
     "archive-product": (el) => db(T("products").update({ archived: true }).eq("id", el.dataset.id), "Removed from website — find it in Archive"),
     "restore-product": (el) => db(T("products").update({ archived: false }).eq("id", el.dataset.id), "Restored"),
     "delete-product": (el) => confirmBox("Permanently delete this product? This cannot be undone.", "Delete", () => db(T("products").delete().eq("id", el.dataset.id), "Product deleted")),
+    "add-service": () => { readSettingsForm(); state.settings.services.push({ key: "svc_" + Date.now(), label: "", rate: 0 }); refresh(); },
+    "remove-service": (el) => { readSettingsForm(); state.settings.services.splice(Number(el.dataset.i), 1); refresh(); },
     "arch-tab": (el) => { ui.archTab = el.dataset.tab; refresh(); },
   };
 
@@ -327,6 +450,8 @@
     if (el && actions[el.dataset.action]) actions[el.dataset.action](el);
   });
   document.addEventListener("input", (e) => {
+    if (["calcService", "calcArea", "calcPaint"].includes(e.target.id))
+      $("#calcOut").innerHTML = calcOut({ svc: $("#calcService").value, area: $("#calcArea").value, paint: $("#calcPaint").value });
     if (e.target.id === "inqSearch") { ui.inq.q = e.target.value; $("#inqBody").innerHTML = inquiryRows(); }
     if (e.target.id === "prodSearch") { ui.prod.q = e.target.value; $("#prodBody").innerHTML = productRows(); }
   });
@@ -338,6 +463,7 @@
     if (id === "prodShow") { ui.prod.show = e.target.value; $("#prodBody").innerHTML = productRows(); }
   });
   document.addEventListener("submit", (e) => {
+    if (e.target.id === "estForm") { e.preventDefault(); saveEstimator(); }
     if (["inqForm", "prodForm"].includes(e.target.id)) e.preventDefault();
   });
 
