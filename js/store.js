@@ -15,16 +15,24 @@ const PalisDB = (() => {
     return data.map((p) => ({ ...p, price: fmtPrice(p.price) }));
   }
 
-  // Public: save an inquiry so the admin can see it
-  async function addInquiry(d) {
-    if (!ready) return false;
-    const { error } = await client.from("inquiries").insert({
-      name: d.name || "", phone: d.phone || "", email: d.email || "",
-      type: d.type || "Product Inquiry", message: d.message || "",
+// Called by the public inquiry form after a successful submit.
+  function addInquiry(data) {
+    const list = read(K.inquiries, []);
+    list.unshift({
+      id: uid(),
+      name: data.name || "",
+      phone: data.phone || "",
+      email: data.email || "",
+      type: data.type || "Product Inquiry",
+      message: data.message || "",
+      status: "new",
+      archived: false,
+      note: "",
+      created: new Date().toISOString(),
     });
-    if (error) console.warn("Supabase inquiry error:", error.message);
-    return !error;
+    write(K.inquiries, list);
   }
+
 
   return { ready, client, fmtPrice, getPublicProducts, addInquiry };
 })();
