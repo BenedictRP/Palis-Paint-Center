@@ -102,7 +102,7 @@ function initProducts(products) {
   render("All");
 }
 
-// Handles the "Send Inquiry" form: submits it straight to Formspree
+// Handles the "Send Inquiry" form: saves to Supabase and emails via Formspree
 function initForm() {
   const form = document.getElementById("inquiryForm");
   if (!form) return;
@@ -116,16 +116,18 @@ function initForm() {
     submitBtn.disabled = true;
 
     try {
-      const response = await fetch(form.action, {
-        method: "POST",
-        body: new FormData(form),
-        headers: { "Accept": "application/json" } // tells Formspree to reply with JSON, not redirect
-      });
+      const data = Object.fromEntries(new FormData(form));
+      // Save to the database (for the admin panel) and email via Formspree at the same time
+      const [saved, response] = await Promise.all([
+        PalisDB.addInquiry(data),
+        fetch(form.action, {
+          method: "POST",
+          body: new FormData(form),
+          headers: { "Accept": "application/json" }
+        }).catch(() => ({ ok: false })),
+      ]);
 
-      if (response.ok) {
-        // keep a copy for the admin panel's Inquiries page
-        PalisStore.addInquiry(Object.fromEntries(new FormData(form)));
-        // success: clear the form and show a thank-you message in place of the button
+      if (saved || response.ok) {
         form.reset();
         submitBtn.textContent = "Sent — thank you!";
         setTimeout(() => {
