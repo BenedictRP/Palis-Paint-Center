@@ -230,6 +230,7 @@
       </form>`,
       `<a class="btn btn-sm" href="tel:${esc(tel)}">Call</a>
        ${i.email ? `<a class="btn btn-sm" href="mailto:${esc(i.email)}">Email</a>` : ""}
+       ${(items.length || i.job) ? `<button class="btn btn-sm" data-action="print-quote" data-id="${i.id}" type="button">Print quote</button>` : ""}
        <button class="btn btn-sm" data-action="archive-inquiry" data-id="${i.id}" type="button">Archive</button>
        <button class="btn btn-gold" data-action="save-inquiry" type="button">Save</button>`);
   }
@@ -313,6 +314,112 @@
     closeModal();
     if (id) await db(D.client.from("products").update(row).eq("id", id), "Product updated");
     else await db(D.client.from("products").insert(row), "Product added");
+  }
+
+  /* ---------- Printable quote ---------- */
+  const SHOP = {
+    name: "Palis Paint Center",
+    phone: "0995 631 7627",
+    address: "Rizal Street, Poblacion East, San Nicolas, Pangasinan, Philippines",
+    validDays: 7,
+  };
+
+  function quoteHtml(i, logo) {
+    const items = i.items || [], j = i.job;
+    const sub = items.reduce((t, it) => t + Number(it.qty) * Number(it.price), 0);
+    const now = new Date();
+    const until = new Date(now.getTime() + SHOP.validDays * 86400000);
+    const d = (x) => x.toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" });
+    const no = "Q-" + now.toISOString().slice(0, 10).replace(/-/g, "") + "-" + String(i.id).slice(-4).toUpperCase();
+    const rows = items.map((it) => `<tr><td>${esc(it.item)}<small>${esc(it.category)} · ${esc(it.unit)}</small></td><td class="c">${Number(it.qty)}</td><td class="r">${fmt(it.price)}</td><td class="r">${fmt(it.qty * it.price)}</td></tr>`).join("");
+    const jobBlock = j ? `
+      <h3>Painting service</h3>
+      <table><tbody>
+        <tr><td>${esc(j.service_label)} <small>${Number(j.area_sqm)} sq m × ${fmt(j.rate)} per sq m</small></td><td class="r">${fmt(j.labor)}</td></tr>
+        ${j.paint_name ? `<tr><td>Paint: ${esc(j.paint_name)} <small>${Number(j.gallons)} gallon(s) × ${fmt(j.paint_price)} · ${Number(j.coats)} coats</small></td><td class="r">${fmt(j.materials)}</td></tr>` : ""}
+        <tr class="sum"><td>Estimated cost of painting job <small>(±${Number(j.margin_pct)}%)</small></td><td class="r">${fmt(j.low)} – ${fmt(j.high)}</td></tr>
+      </tbody></table>` : "";
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quotation ${esc(no)} — ${esc(i.name)}</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;color:#1c2b3a;margin:0;background:#e9e6dd;font-size:14px;line-height:1.45}
+  .bar{position:sticky;top:0;background:#1c2b3a;color:#fff;padding:10px 16px;display:flex;gap:10px;justify-content:space-between;align-items:center}
+  .bar button{background:#e2a638;border:0;border-radius:4px;padding:10px 18px;font-weight:700;font-size:14px;cursor:pointer}
+  .page{background:#fff;max-width:800px;margin:18px auto;padding:36px 40px}
+  .top{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border-bottom:3px solid #c23b2c;padding-bottom:16px}
+  .shop{display:flex;gap:14px;align-items:center}
+  .shop img{height:60px;width:auto;max-width:110px;object-fit:contain}
+  .shop b{font-size:20px;display:block}
+  .shop span{font-size:12.5px;color:#555;display:block}
+  .meta{text-align:right;font-size:13px}
+  .meta h1{margin:0 0 6px;font-size:26px;letter-spacing:.04em;color:#c23b2c}
+  .to{margin:20px 0 6px;display:flex;gap:30px;flex-wrap:wrap}
+  .to div{min-width:200px}
+  .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#777;margin-bottom:2px}
+  h3{font-size:14px;margin:24px 0 8px;text-transform:uppercase;letter-spacing:.08em}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#666;border-bottom:2px solid #1c2b3a;padding:8px 6px}
+  td{padding:9px 6px;border-bottom:1px solid #ddd;vertical-align:top}
+  td small{display:block;color:#777;font-size:12px}
+  .c{text-align:center;white-space:nowrap}.r{text-align:right;white-space:nowrap}
+  th.c{text-align:center}th.r{text-align:right}
+  tr.sum td{font-weight:700;border-bottom:0}
+  .total{margin-top:22px;background:#1c2b3a;color:#fff;border-radius:6px;padding:16px 20px;display:flex;justify-content:space-between;gap:16px;align-items:center;font-size:18px}
+  .total b{font-size:22px;white-space:nowrap}
+  .note{margin-top:22px;font-size:12.5px;color:#444}
+  .note li{margin-bottom:4px}
+  .foot{margin-top:26px;text-align:center;font-size:12px;color:#777}
+  @media (max-width:600px){.page{margin:0;padding:22px 16px}.top{flex-direction:column}.meta{text-align:left}.total{flex-direction:column;align-items:flex-start}}
+  @media print{
+    body{background:#fff}.bar{display:none}
+    .page{margin:0;max-width:none;padding:0}
+    .total{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    tr{break-inside:avoid}
+  }
+  @page{margin:16mm}
+</style></head><body>
+<div class="bar"><span>Quotation preview</span><button onclick="window.print()">Print / Save as PDF</button></div>
+<div class="page">
+  <div class="top">
+    <div class="shop">${logo ? `<img src="${logo}" alt="">` : ""}<div><b>${esc(SHOP.name)}</b><span>${esc(SHOP.address)}</span><span>Tel: ${esc(SHOP.phone)}</span></div></div>
+    <div class="meta"><h1>QUOTATION</h1><div><b>No.</b> ${esc(no)}</div><div><b>Date:</b> ${d(now)}</div><div><b>Valid until:</b> ${d(until)}</div></div>
+  </div>
+  <div class="to">
+    <div><div class="lbl">Prepared for</div><b>${esc(i.name)}</b><br>${esc(i.phone)}${i.email ? `<br>${esc(i.email)}` : ""}</div>
+    <div><div class="lbl">Request</div>${esc(i.type)}<br><span style="color:#777">Inquiry received ${fmtDate(i.created_at)}</span></div>
+  </div>
+  ${items.length ? `<h3>Products</h3>
+  <table><thead><tr><th>Item</th><th class="c">Qty</th><th class="r">Unit price</th><th class="r">Amount</th></tr></thead><tbody>${rows}
+    <tr class="sum"><td colspan="3" class="r">Products subtotal</td><td class="r">${fmt(sub)}</td></tr></tbody></table>` : ""}
+  ${jobBlock}
+  <div class="total"><span>Total estimate</span><b>${estText(i)}</b></div>
+  <ul class="note">
+    <li>All amounts are in Philippine pesos (PHP).</li>
+    <li>This quotation is an estimate based on your inquiry. The final price is confirmed by ${esc(SHOP.name)} after checking the area, the paint chosen and current stock.</li>
+    <li>Prices are valid until ${d(until)} and may change after that date.</li>
+  </ul>
+  <div class="foot">Thank you for choosing ${esc(SHOP.name)} · ${esc(SHOP.phone)}</div>
+</div>
+</body></html>`;
+  }
+
+  // The logo is embedded in the quote so it always shows when printed or saved as PDF
+  async function logoDataUrl() {
+    try {
+      const blob = await (await fetch(new URL("../images/palis-logo.png", location.href))).blob();
+      return await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(blob); });
+    } catch (e) { return ""; }
+  }
+
+  async function printQuote(id) {
+    const i = find(state.inquiries, id);
+    if (!i) return;
+    const w = window.open("", "_blank"); // opened right away so pop-up blockers allow it
+    if (!w) return toast("Please allow pop-ups for this site to open the quote.");
+    w.document.write("<p style='font-family:Arial;padding:20px'>Preparing quote…</p>");
+    const logo = await logoDataUrl();
+    w.document.open(); w.document.write(quoteHtml(i, logo)); w.document.close();
   }
 
   /* ---------- Estimator ---------- */
@@ -428,6 +535,7 @@
     "open-inquiry": (el) => openInquiry(el.dataset.id),
     "save-inquiry": saveInquiry,
     "export-inquiries": exportInquiries,
+    "print-quote": (el) => printQuote(el.dataset.id),
     "archive-inquiry": (el) => { closeModal(); db(T("inquiries").update({ archived: true }).eq("id", el.dataset.id), "Moved to archive"); },
     "restore-inquiry": (el) => db(T("inquiries").update({ archived: false }).eq("id", el.dataset.id), "Restored"),
     "delete-inquiry": (el) => confirmBox("Permanently delete this inquiry? This cannot be undone.", "Delete", () => db(T("inquiries").delete().eq("id", el.dataset.id), "Inquiry deleted")),
@@ -505,4 +613,3 @@
     if (data.session) start(data.session); else showLogin();
   })();
 })();
-
